@@ -1,45 +1,48 @@
 import boto3
+import json
 
-###########  Creating 2 EC2 Instance  ##########
-amiId="ami-062cf18d655c0b1e8"
-keyPair="Yash_HV"
-def createEC2():
-    ec2=boto3.client('ec2')
-    res = ec2.run_instances(
-        ImageId=amiId,
-        MinCount=2,
-        MaxCount=2,
-        InstanceType='t2.micro',
-        KeyName=keyPair
-    )
-    # print(res)
-    return res
-instances = createEC2()
-print("Successfully launched EC2 Instances")
-instance1 = instances['Instances'][0]['InstanceId']
-instance2 = instances['Instances'][1]['InstanceId']
-print("First Instance: "+instance1)
-print("Second Instance: "+instance2)
+def lambda_handler(event, context):
+    # TODO implement
+    stopIns = [i['Instances'][0]['InstanceId'] for i in describeInstanceByTag('Auto-Stop')['Reservations']]
+    startIns = [i['Instances'][0]['InstanceId'] for i in describeInstanceByTag('Auto-Start')['Reservations']]
+    print(stopIns)
+    print(startIns)
+    stopInstance(stopIns)
+    startInstance(startIns)
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Hello from Lambda!')
+    }
+    
 
-########### Attaching Tag to EC2 Instances  ###########
-def attachTagToInstance():
+###########  Start Instance  ##########
+def startInstance(instances):
     ec2=boto3.client('ec2')
-    autoStart = ec2.create_tags(
-        Resources=[instance1],
-        Tags=[
-            {'Key': 'Name', 'Value': 'Yash-Auto-Start'},
-            {'Key': 'Type', 'Value': 'Auto-Start'}
-        ]
+    startResponse = ec2.start_instances(
+        InstanceIds=instances,
     )
-    # print(autoStart)
-    print("Successfully attached auto start tag")
-    autoStop = ec2.create_tags(
-        Resources=[instance2],
-        Tags=[
-            {'Key': 'Name', 'Value': 'Yash-Auto-Stop'},
-            {'Key': 'Type', 'Value': 'Auto-Stop'}
-        ]
+    print(startResponse)
+
+
+###########  Stop Instance  ##########
+def stopInstance(instances):
+    ec2=boto3.client('ec2')
+    stopResponse = ec2.stop_instances(
+        InstanceIds=instances,
     )
-    # print(autoStart)
-    print("Successfully attached auto stop tag")
-attachTagToInstance()
+    print(stopResponse)
+
+###########  Getting Instances with specific tags. #########
+def describeInstanceByTag(tag):
+    ec2=boto3.client('ec2')
+    response = ec2.describe_instances(
+        Filters=[
+            {
+                'Name': 'tag:Type',
+                'Values': [
+                    tag,
+                ],
+            },
+        ],
+    )
+    return response
